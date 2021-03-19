@@ -477,7 +477,7 @@ impl Value {
                     precision,
                     num_bytes,
                     max_precision_for_num_bytes,
-                })
+                });
             }
         }
 
@@ -650,7 +650,7 @@ impl Value {
         };
         // Find the first match in the reader schema.
         let (_, inner) = schema
-            .resolve_union_schema(&v)
+            .resolve_union_schema(&v)
             .ok_or_else(|| Error::FindUnionVariant)?;
         Ok(Value::Union(Box::new(v.resolve(inner)?)))
     }
@@ -964,7 +964,7 @@ mod tests {
     fn resolve_decimal_bytes() {
         let value = Value::Decimal(Decimal::from(vec![1, 2]));
         let mut builder = Schema::builder();
-        let mut decimal = builder.named_decimal("test");
+        let mut decimal = builder.decimal();
         decimal.scale(2);
         let root = decimal.precision(4, &mut builder).unwrap();
         let expected = builder.build(root).unwrap();
@@ -975,7 +975,7 @@ mod tests {
     #[test]
     fn resolve_decimal_invalid_scale() {
         let mut builder = Schema::builder();
-        let mut decimal = builder.named_decimal("test");
+        let mut decimal = builder.decimal();
         decimal.scale(3);
         let root = decimal.precision(2, &mut builder);
         assert!(root.is_err())
@@ -985,10 +985,7 @@ mod tests {
     fn resolve_decimal_invalid_precision_for_length() {
         let value = Value::Decimal(Decimal::from((1u8..=8u8).rev().collect::<Vec<_>>()));
         let mut builder = Schema::builder();
-        let root = builder
-            .named_decimal("test")
-            .precision(1, &mut builder)
-            .unwrap();
+        let root = builder.decimal().precision(1, &mut builder).unwrap();
         let expected = builder.build(root).unwrap();
         assert!(value.resolve(expected.root()).is_err());
     }

@@ -105,7 +105,11 @@ pub enum Error {
     GetU8(ValueKind),
 
     #[error("Precision {precision} too small to hold decimal values with {num_bytes} bytes. Should be at least {max_precision_for_num_bytes}")]
-    ComparePrecisionAndSize { precision: u64, max_precision_for_num_bytes: u64, num_bytes: u64 },
+    ComparePrecisionAndSize {
+        precision: u64,
+        max_precision_for_num_bytes: u64,
+        num_bytes: u64,
+    },
 
     #[error("Cannot convert length to i32: {1}")]
     ConvertLengthToI32(#[source] std::num::TryFromIntError, usize),

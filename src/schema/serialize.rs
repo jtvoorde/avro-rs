@@ -96,7 +96,6 @@ impl Serialize for OnceSchemaCell<DecimalSchema<'_>> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("type", "decimal")?;
-        serialize_formal_name!(self.actual.name(), self.prev_ns.borrow(), map);
         map.serialize_entry("precision", &self.actual.precision())?;
         map.serialize_entry("scale", &self.actual.scale())?;
         map.end()

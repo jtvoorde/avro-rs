@@ -27,12 +27,15 @@ impl<'s> SchemaParser<'s> {
 
     /// Parse the schema from a string
     pub fn parse_list(&mut self, raws: &'s [Value]) -> Result<Vec<Schema>, Error> {
-        let schemas: Result<Vec<_>, _> = raws
+        let schema_roots: Result<Vec<NameRef>, Error> = raws
             .into_iter()
-            .map(|value| self.parse(&value).map_err(|e| e.into()))
+            .map(|value| self.parse_schema(&value).map_err(|e| e.into()))
             .collect();
 
-        schemas
+        schema_roots?
+            .iter()
+            .map(|root| self.builder.build(*root).map_err(|e| e.into()))
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Create a `AvroSchema` from a `serde_json::Value` representing a JSON Avro schema.
@@ -92,22 +95,7 @@ impl<'s> SchemaParser<'s> {
     /// Avro supports "recursive" definition of types.
     /// e.g: {"type": {"type": "string"}}
     fn parse_complex(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
-        if let Some(logical_type) = complex.get("logicalType").and_then(|v| v.as_str()) {
-            match logical_type {
-                "uuid" => return Ok(self.builder.uuid()),
-                "date" => return Ok(self.builder.date()),
-                "time-millis" => return Ok(self.builder.time_millis()),
-                "time-micros" => return Ok(self.builder.time_micros()),
-                //"timestamp" => return Ok(self.builder.timestamp()),
-                "timestamp-millis" => return Ok(self.builder.timestamp_millis()),
-                "timestamp-micros" => return Ok(self.builder.timestamp_micros()),
-                "decimal" => return self.parse_decimal(complex),
-                // As per spec, let it pass as a type since we dont understand the given logical
-                _ => (),
-            };
-        }
-
-        match complex.get("type") {
+        let schema = match complex.get("type") {
             Some(&Value::String(ref t)) => match t.as_str() {
                 "record" => self.parse_record(complex),
                 "enum" => self.parse_enum(complex),
@@ -121,6 +109,80 @@ impl<'s> SchemaParser<'s> {
                 None => Err(Error::GetComplexTypeField),
             },
             _ => Err(Error::GetComplexTypeField),
+        }?;
+
+        if let Some(logical_type) = complex.get("logicalType").and_then(|v| v.as_str()) {
+            self.logical_schema(logical_type, schema, complex)
+        } else {
+            Ok(schema)
+        }
+    }
+
+    fn logical_schema(
+        &mut self,
+        logical_type: &str,
+        schema: NameRef,
+        complex: &'s JsonMap,
+    ) -> AvroResult<NameRef> {
+        match logical_type {
+            "uuid" => {
+                if schema == self.builder.string() {
+                    Ok(self.builder.uuid())
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+            "date" => {
+                if schema == self.builder.int() {
+                    Ok(self.builder.date())
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+
+            "time-millis" => {
+                if schema == self.builder.int() {
+                    Ok(self.builder.time_millis())
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+            "time-micros" => {
+                if schema == self.builder.long() {
+                    Ok(self.builder.time_micros())
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+
+            //"timestamp" => return Ok(self.builder.timestamp()),
+            "timestamp-millis" => {
+                if schema == self.builder.long() {
+                    Ok(self.builder.timestamp_millis())
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+
+            "timestamp-micros" => {
+                if schema == self.builder.long() {
+                    Ok(self.builder.timestamp_micros())
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+
+            "decimal" => {
+                if true {
+                    // TODO: Check fixed or decimal
+                    self.parse_decimal(complex)
+                } else {
+                    Err(Error::GetLogicalTypeFieldType)
+                }
+            }
+
+            // As per spec, let it pass as a type since we dont understand the given logical
+            _ => return Ok(schema),
         }
     }
 
@@ -230,9 +292,7 @@ impl<'s> SchemaParser<'s> {
 
     /// Parse a `serde_json::Value` representing a Avro logical decimal type into a `Schema`.
     fn parse_decimal(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
-        let mut builder = self
-            .parse_name::<DecimalBuilder>(complex)
-            .unwrap_or_else(|_| DecimalBuilder::new());
+        let mut builder = DecimalBuilder::new();
 
         // Match to the kind to reduce matching noise
         let is_fixed = match complex.get("type").and_then(|x| x.as_str()) {
@@ -243,10 +303,9 @@ impl<'s> SchemaParser<'s> {
         };
 
         if is_fixed {
-            let size = complex
-                .get("size")
-                .and_then(|v| v.as_u64())
-                .ok_or(Error::GetDecimalMetadataFromJson("Missing `size` for `fixed` double"))?;
+            let size = complex.get("size").and_then(|v| v.as_u64()).ok_or(
+                Error::GetDecimalMetadataFromJson("Missing `size` for `fixed` double"),
+            )?;
             builder.size(size);
         }
 
@@ -254,10 +313,9 @@ impl<'s> SchemaParser<'s> {
             builder.scale(scale);
         }
 
-        let precision = complex
-            .get("precision")
-            .and_then(|v| v.as_u64())
-            .ok_or(Error::GetDecimalMetadataFromJson("Missing `precision` for double"))?;
+        let precision = complex.get("precision").and_then(|v| v.as_u64()).ok_or(
+            Error::GetDecimalMetadataFromJson("Missing `precision` for double"),
+        )?;
 
         builder.precision(precision, &mut self.builder)
     }
