@@ -569,7 +569,7 @@
 //!           "type": {
 //!             "type": "fixed",
 //!             "size": 12,
-//!             "name": "duration"
+//!             "name": "duration12"
 //!           },
 //!           "logicalType": "duration"
 //!         }

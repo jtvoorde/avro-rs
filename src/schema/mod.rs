@@ -574,6 +574,10 @@ impl<'s> UnionSchema<'s> {
             // TODO shouldn't we also check for name and namespace?
             .find(|(_pos, schema_type)| {
                 let schema_kind = SchemaKind::from(*schema_type);
+                // A number default is always represented as a Value::Long. This check ensures that the right schema branch is found.
+                // TODO: Check what happens if kind is a logicalType and value resolves to a primitive? (uuid against string for instance)
+                // Also, if we have a schema with ["int", "long"] the int branch will be chosen. This probably cannot be fixed.
+
                 match (schema_kind, value) {
                     (SchemaKind::Int, &crate::types::Value::Long(v)) => {
                         v >= i32::min_value() as i64 && v <= i32::max_value() as i64
