@@ -424,28 +424,34 @@ const DECIMAL_LOGICAL_TYPE: &[(&str, bool)] = &[
 ];
 
 const DECIMAL_LOGICAL_TYPE_ATTRIBUTES: &[(&str, bool)] = &[
-    /*
     // TODO: (#93) support logical types and attributes and uncomment
+    // (
+    //     r#"{
+    //         "type": "fixed",
+    //         "logicalType": "decimal",
+    //         "name": "TestDecimal",
+    //         "precision": 4,
+    //         "scale": 2,
+    //         "size": 2
+    //     }"#,
+    //     true,
+    // ),
+    // (
+    //     r#"{
+    //         "type": "bytes",
+    //         "logicalType": "decimal",
+    //         "precision": 4
+    //     }"#,
+    //     true,
+    // ),
     (
         r#"{
-            "type": "fixed",
-            "logicalType": "decimal",
-            "name": "TestDecimal",
-            "precision": 4,
-            "scale": 2,
-            "size": 2
-        }"#,
-        true
-    ),
-    (
-        r#"{
-            "type": "bytes",
+            "type": "string",
             "logicalType": "decimal",
             "precision": 4
         }"#,
-        true
+        false,
     ),
-    */
 ];
 
 const DATE_LOGICAL_TYPE: &[(&str, bool)] = &[

@@ -333,7 +333,7 @@ impl Value {
             (&Value::Float(_), SchemaType::Float) => true,
             (&Value::Double(_), SchemaType::Double) => true,
             (&Value::Bytes(_), SchemaType::Bytes) => true,
-            (&Value::Bytes(_), SchemaType::Decimal(dec)) => true,
+            (&Value::Bytes(_), SchemaType::Decimal(_)) => true,
             (&Value::String(_), SchemaType::String) => true,
             (&Value::String(_), SchemaType::Uuid) => true,
             //TODO: do we need to use name here for the fixed?

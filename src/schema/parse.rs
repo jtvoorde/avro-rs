@@ -172,14 +172,12 @@ impl<'s> SchemaParser<'s> {
                 }
             }
 
-            "decimal" => {
-                if true {
-                    // TODO: Check fixed or decimal
+            "decimal" => match complex.get("type") {
+                Some(Value::String(typ)) if typ == "fixed" || typ == "bytes" => {
                     self.parse_decimal(complex)
-                } else {
-                    Err(Error::GetLogicalTypeFieldType)
                 }
-            }
+                _ => Err(Error::GetLogicalTypeFieldType),
+            },
 
             // As per spec, let it pass as a type since we dont understand the given logical
             _ => return Ok(schema),

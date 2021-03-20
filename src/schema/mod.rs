@@ -22,7 +22,6 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{HashMap, HashSet},
-    convert::TryInto,
     fmt,
     rc::Rc,
 };

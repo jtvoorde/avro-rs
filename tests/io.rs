@@ -39,12 +39,14 @@ lazy_static! {
         (r#""boolean""#, "true", Value::Boolean(true)),
         (r#""string""#, r#""foo""#, Value::String("foo".to_string())),
         // TODO: (#96) investigate why this is failing
-        //(r#""bytes""#, r#""\u00FF\u00FF""#, Value::Bytes(vec![0xff, 0xff])),
+        // > Reason is that the 00FF unicode char is encoded as a \xC3 \xBF which is not converted back to \xFF.
+        // (r#""bytes""#, r#""\u00FF\u00FF""#, Value::Bytes(vec![0xff, 0xff])),
         (r#""int""#, "5", Value::Int(5)),
         (r#""long""#, "5", Value::Long(5)),
         (r#""float""#, "1.1", Value::Float(1.1)),
         (r#""double""#, "1.1", Value::Double(1.1)),
         // TODO: (#96) investigate why this is failing
+        // Probably same as bytes
         //(r#"{"type": "fixed", "name": "F", "size": 2}"#, r#""\u00FF\u00FF""#, Value::Bytes(vec![0xff, 0xff])),
         (r#"{"type": "enum", "name": "F", "symbols": ["FOO", "BAR"]}"#, r#""FOO""#, Value::Enum(0, "FOO".to_string())),
         (r#"{"type": "array", "items": "int"}"#, "[1, 2, 3]", Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)])),
