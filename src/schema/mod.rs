@@ -428,6 +428,10 @@ impl<'s> DecimalSchema<'s> {
         self.0.root()
     }
 
+    pub fn name(&self) -> Name<'_> {
+        Name(self.0, self.1)
+    }
+
     pub fn is_fixed(&self) -> bool {
         self.size().is_some()
     }

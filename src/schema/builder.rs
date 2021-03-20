@@ -191,14 +191,16 @@ impl<'s> FixedBuilder<'s> {
 
 /// Builder that creates a decimal buffer in a schema
 #[derive(Default)]
-pub struct DecimalBuilder {
+pub struct DecimalBuilder<'s> {
+    name: Option<Naming<'s>>,
     size: Option<u64>,
     scale: Option<u64>,
 }
 
-impl DecimalBuilder {
+impl<'s> DecimalBuilder<'s> {
     pub fn new() -> Self {
         DecimalBuilder {
+            name: None,
             ..Default::default()
         }
     }
@@ -219,15 +221,27 @@ impl DecimalBuilder {
             });
         }
 
+        let name_ref = if let Some(name) = self.name {
+            Some(name.into_ref(builder)?)
+        } else {
+            None
+        };
+
         let schema_datum = SchemaData::Decimal {
+            name: name_ref,
             precision,
             scale: self.scale,
             size: self.size,
         };
 
-        builder.add_anon_type(schema_datum)
+        match name_ref {
+            Some(name) => builder.add_type(name, schema_datum),
+            None => builder.add_anon_type(schema_datum),
+        }
     }
 }
+
+impl_opt_named_builder!(DecimalBuilder);
 
 pub struct EnumBuilder<'s> {
     name: Naming<'s>,
@@ -404,8 +418,12 @@ impl SchemaBuilder {
     logical_type_lookup!(timestamp_micros);
     logical_type_lookup!(duration);
 
-    pub fn decimal<'s>(&self) -> DecimalBuilder {
+    pub fn decimal<'s>(&self) -> DecimalBuilder<'s> {
         DecimalBuilder::new()
+    }
+
+    pub fn named_decimal<'s>(&self, name: &'s str) -> DecimalBuilder<'s> {
+        DecimalBuilder::name(name)
     }
 
     pub fn enumeration<'s>(&self, name: &'s str) -> EnumBuilder<'s> {

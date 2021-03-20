@@ -95,35 +95,33 @@ impl<'s> SchemaParser<'s> {
     /// Avro supports "recursive" definition of types.
     /// e.g: {"type": {"type": "string"}}
     fn parse_complex(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
-        let schema = match complex.get("type") {
+        match complex.get("type") {
             Some(&Value::String(ref t)) => match t.as_str() {
                 "record" => self.parse_record(complex),
                 "enum" => self.parse_enum(complex),
                 "array" => self.parse_array(complex),
                 "map" => self.parse_map(complex),
                 "fixed" => self.parse_fixed(complex),
-                other => self.parse_typeref(other),
+                "bytes" => self.parse_bytes(complex),
+                other => {
+                    let schema = self.parse_typeref(other)?;
+                    if let Some(logical_type) = complex.get("logicalType").and_then(|v| v.as_str())
+                    {
+                        self.logical_schema(logical_type, schema)
+                    } else {
+                        Ok(schema)
+                    }
+                }
             },
             Some(&Value::Object(ref data)) => match data.get("type") {
                 Some(ref value) => self.parse_schema(value),
                 None => Err(Error::GetComplexTypeField),
             },
             _ => Err(Error::GetComplexTypeField),
-        }?;
-
-        if let Some(logical_type) = complex.get("logicalType").and_then(|v| v.as_str()) {
-            self.logical_schema(logical_type, schema, complex)
-        } else {
-            Ok(schema)
         }
     }
 
-    fn logical_schema(
-        &mut self,
-        logical_type: &str,
-        schema: NameRef,
-        complex: &'s JsonMap,
-    ) -> AvroResult<NameRef> {
+    fn logical_schema(&mut self, logical_type: &str, schema: NameRef) -> AvroResult<NameRef> {
         match logical_type {
             "uuid" => {
                 if schema == self.builder.string() {
@@ -171,13 +169,6 @@ impl<'s> SchemaParser<'s> {
                     Err(Error::GetLogicalTypeFieldType)
                 }
             }
-
-            "decimal" => match complex.get("type") {
-                Some(Value::String(typ)) if typ == "fixed" || typ == "bytes" => {
-                    self.parse_decimal(complex)
-                }
-                _ => Err(Error::GetLogicalTypeFieldType),
-            },
 
             // As per spec, let it pass as a type since we dont understand the given logical
             _ => return Ok(schema),
@@ -278,6 +269,12 @@ impl<'s> SchemaParser<'s> {
 
     /// Parse a `serde_json::Value` representing a Avro fixed type into a `Schema`.
     fn parse_fixed(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
+        if let Some(logical_type) = complex.get("logicalType") {
+            if logical_type == "decimal" {
+                return self.parse_decimal(complex);
+            }
+        }
+
         let fixed_builder = self.parse_name::<FixedBuilder>(complex)?;
 
         let size = complex
@@ -288,10 +285,21 @@ impl<'s> SchemaParser<'s> {
         fixed_builder.size(size, &mut self.builder)
     }
 
+    fn parse_bytes(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
+        if let Some(logical_type) = complex.get("logicalType") {
+            if logical_type == "decimal" {
+                return self.parse_decimal(complex);
+            }
+        }
+
+        Ok(self.builder.bytes())
+    }
+
     /// Parse a `serde_json::Value` representing a Avro logical decimal type into a `Schema`.
     fn parse_decimal(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
-        let mut builder = DecimalBuilder::new();
-
+        let mut builder = self
+            .parse_name::<DecimalBuilder>(complex)
+            .unwrap_or_else(|_| DecimalBuilder::new());
         // Match to the kind to reduce matching noise
         let is_fixed = match complex.get("type").and_then(|x| x.as_str()) {
             Some("bytes") => false,

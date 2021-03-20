@@ -498,7 +498,7 @@ mod tests {
         let size = 30;
 
         let mut builder = Schema::builder();
-        let mut decimal = builder.decimal();
+        let mut decimal = builder.named_decimal("fixed_decimal");
         decimal.scale(5);
         decimal.size(size as u64);
         let root = decimal.precision(20, &mut builder)?;

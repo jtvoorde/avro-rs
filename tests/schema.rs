@@ -425,32 +425,24 @@ const DECIMAL_LOGICAL_TYPE: &[(&str, bool)] = &[
 
 const DECIMAL_LOGICAL_TYPE_ATTRIBUTES: &[(&str, bool)] = &[
     // TODO: (#93) support logical types and attributes and uncomment
-    // (
-    //     r#"{
-    //         "type": "fixed",
-    //         "logicalType": "decimal",
-    //         "name": "TestDecimal",
-    //         "precision": 4,
-    //         "scale": 2,
-    //         "size": 2
-    //     }"#,
-    //     true,
-    // ),
-    // (
-    //     r#"{
-    //         "type": "bytes",
-    //         "logicalType": "decimal",
-    //         "precision": 4
-    //     }"#,
-    //     true,
-    // ),
     (
         r#"{
-            "type": "string",
+            "type": "fixed",
+            "logicalType": "decimal",
+            "name": "TestDecimal",
+            "precision": 4,
+            "scale": 2,
+            "size": 2
+        }"#,
+        true,
+    ),
+    (
+        r#"{
+            "type": "bytes",
             "logicalType": "decimal",
             "precision": 4
         }"#,
-        false,
+        true,
     ),
 ];
 
@@ -600,6 +592,8 @@ fn test_parse() {
 fn test_valid_cast_to_string_after_parse() {
     for (raw_schema, _) in VALID_EXAMPLES.iter() {
         let schema = Schema::parse_str(raw_schema).unwrap();
+
+        println!("{:?}", schema.to_string());
         Schema::parse_str(schema.canonical_form().as_str()).unwrap();
     }
 }
