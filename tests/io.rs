@@ -1,5 +1,5 @@
 //! Port of https://github.com/apache/avro/blob/release-1.9.1/lang/py/test/test_io.py
-use std::io::Cursor;
+use std::{io::Cursor, str::FromStr};
 
 use avro_rs::{from_avro_datum, to_avro_datum, types::Value, Error, Schema};
 use lazy_static::lazy_static;
@@ -52,6 +52,9 @@ lazy_static! {
         (r#"{"type": "array", "items": "int"}"#, "[1, 2, 3]", Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)])),
         (r#"{"type": "map", "values": "int"}"#, r#"{"a": 1, "b": 2}"#, Value::Map([("a".to_string(), Value::Int(1)), ("b".to_string(), Value::Int(2))].iter().cloned().collect())),
         (r#"["int", "null"]"#, "5", Value::Union(Box::new(Value::Int(5)))),
+        // TODO: (#91) investigate why this is failing
+        //(r#"[{"type": {"type": "string", "logicalType": "uuid"}}, "null"]"#, r#""64a8cd70-28e3-4fc4-9c7f-db18d8cac512""#, Value::Union(Box::new(Value::Uuid(uuid::Uuid::from_str("64a8cd70-28e3-4fc4-9c7f-db18d8cac512").unwrap())))),
+
         (r#"{"type": "record", "name": "F", "fields": [{"name": "A", "type": "int"}]}"#, r#"{"A": 5}"#,Value::Record(vec![("A".to_string(), Value::Int(5))])),
     ];
 

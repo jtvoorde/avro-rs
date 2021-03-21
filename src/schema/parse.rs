@@ -96,7 +96,7 @@ impl<'s> SchemaParser<'s> {
     /// e.g: {"type": {"type": "string"}}
     fn parse_complex(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
         match complex.get("type") {
-            Some(&Value::String(ref t)) => match t.as_str() {
+            Some(&Value::String(ref typ)) => match typ.as_str() {
                 "record" => self.parse_record(complex),
                 "enum" => self.parse_enum(complex),
                 "array" => self.parse_array(complex),
@@ -107,7 +107,7 @@ impl<'s> SchemaParser<'s> {
                     let schema = self.parse_typeref(other)?;
                     if let Some(logical_type) = complex.get("logicalType").and_then(|v| v.as_str())
                     {
-                        self.logical_schema(logical_type, schema)
+                        self.logical_schema(typ.as_str(), logical_type, schema)
                     } else {
                         Ok(schema)
                     }
@@ -121,20 +121,25 @@ impl<'s> SchemaParser<'s> {
         }
     }
 
-    fn logical_schema(&mut self, logical_type: &str, schema: NameRef) -> AvroResult<NameRef> {
+    fn logical_schema(
+        &mut self,
+        typ: &str,
+        logical_type: &str,
+        schema: NameRef,
+    ) -> AvroResult<NameRef> {
         match logical_type {
             "uuid" => {
                 if schema == self.builder.string() {
                     Ok(self.builder.uuid())
                 } else {
-                    Err(Error::GetLogicalTypeFieldType)
+                    Err(Error::GetLogicalTypeVariant(typ.to_string()))
                 }
             }
             "date" => {
                 if schema == self.builder.int() {
                     Ok(self.builder.date())
                 } else {
-                    Err(Error::GetLogicalTypeFieldType)
+                    Err(Error::GetLogicalTypeVariant(typ.to_string()))
                 }
             }
 
@@ -142,14 +147,14 @@ impl<'s> SchemaParser<'s> {
                 if schema == self.builder.int() {
                     Ok(self.builder.time_millis())
                 } else {
-                    Err(Error::GetLogicalTypeFieldType)
+                    Err(Error::GetLogicalTypeVariant(typ.to_string()))
                 }
             }
             "time-micros" => {
                 if schema == self.builder.long() {
                     Ok(self.builder.time_micros())
                 } else {
-                    Err(Error::GetLogicalTypeFieldType)
+                    Err(Error::GetLogicalTypeVariant(typ.to_string()))
                 }
             }
 
@@ -158,7 +163,7 @@ impl<'s> SchemaParser<'s> {
                 if schema == self.builder.long() {
                     Ok(self.builder.timestamp_millis())
                 } else {
-                    Err(Error::GetLogicalTypeFieldType)
+                    Err(Error::GetLogicalTypeVariant(typ.to_string()))
                 }
             }
 
@@ -166,7 +171,7 @@ impl<'s> SchemaParser<'s> {
                 if schema == self.builder.long() {
                     Ok(self.builder.timestamp_micros())
                 } else {
-                    Err(Error::GetLogicalTypeFieldType)
+                    Err(Error::GetLogicalTypeVariant(typ.to_string()))
                 }
             }
 
@@ -269,18 +274,25 @@ impl<'s> SchemaParser<'s> {
 
     /// Parse a `serde_json::Value` representing a Avro fixed type into a `Schema`.
     fn parse_fixed(&mut self, complex: &'s JsonMap) -> AvroResult<NameRef> {
-        if let Some(logical_type) = complex.get("logicalType") {
-            if logical_type == "decimal" {
-                return self.parse_decimal(complex);
-            }
-        }
-
         let fixed_builder = self.parse_name::<FixedBuilder>(complex)?;
 
         let size = complex
             .get("size")
             .and_then(|v| v.as_i64().map(|x| x as usize))
             .ok_or_else(|| Error::GetFixedSizeField)?;
+
+        if let Some(logical_type) = complex.get("logicalType") {
+            if logical_type == "decimal" {
+                return self.parse_decimal(complex);
+            } else if logical_type == "duration" {
+                // Duration must be backed by a fixed type of size 12.
+                if size == 12 {
+                    return Ok(self.builder.duration());
+                } else {
+                    return Err(Error::GetDurationInvalidSize);
+                }
+            }
+        }
 
         fixed_builder.size(size, &mut self.builder)
     }

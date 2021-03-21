@@ -256,13 +256,16 @@ pub enum Error {
     },
 
     #[error("Unexpected `type` {0} variant for `logicalType`")]
-    GetLogicalTypeVariant(serde_json::Value),
+    GetLogicalTypeVariant(String),
 
     #[error("No `type` field found for `logicalType`")]
     GetLogicalTypeField,
 
     #[error("logicalType must be a string")]
     GetLogicalTypeFieldType,
+
+    #[error("Duration must have a fixed length of 12 bytes.")]
+    GetDurationInvalidSize,
 
     #[error("Unknown complex type: {0}")]
     GetComplexType(serde_json::Value),
