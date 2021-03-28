@@ -708,11 +708,7 @@ impl Value {
                     Some(value) => value,
                     None => match field.default() {
                         Some(value) => {
-                            let value: Value = value.clone().into();
-                            match field.schema() {
-                                SchemaType::Enum(enum_) => value.resolve_enum(&enum_.symbols())?,
-                                _ => value,
-                            }
+                            Self::resolve_default_value(&field.schema(), value.clone().into())?
                         }
                         _ => return Err(Error::GetField(field.name().to_owned())),
                     },
@@ -724,6 +720,16 @@ impl Value {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Value::Record(new_fields))
+    }
+
+    fn resolve_default_value(schema: &SchemaType, value: Value) -> Result<Value, Error> {
+        let resolved_value = match schema {
+            SchemaType::Union(schema) => Self::resolve_default_value(&schema.variants()[0], value)?, // The default value must resolve to the first variant of the union.
+            SchemaType::Enum(enum_) => value.resolve_enum(&enum_.symbols())?,
+            _ => value.resolve(*schema)?,
+        };
+
+        Ok(resolved_value)
     }
 
     fn try_u8(self) -> AvroResult<u8> {
