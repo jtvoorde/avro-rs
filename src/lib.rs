@@ -807,11 +807,14 @@ mod tests {
         let mut reader = Reader::with_schema(&reader_schema, &input[..]).unwrap();
         assert_eq!(
             reader.next().unwrap().unwrap(),
-            Value::Record(vec![
-                ("a".to_string(), Value::Long(27)),
-                ("b".to_string(), Value::String("foo".to_string())),
-                ("c".to_string(), Value::Enum(1, "spades".to_string())),
-            ])
+            Value::Record(
+                "test".to_owned(),
+                vec![
+                    ("a".to_string(), Value::Long(27)),
+                    ("b".to_string(), Value::String("foo".to_string())),
+                    ("c".to_string(), Value::Enum(1, "spades".to_string())),
+                ]
+            )
         );
         assert!(reader.next().is_none());
     }
@@ -849,11 +852,14 @@ mod tests {
         let mut reader = Reader::with_schema(&schema, &input[..]).unwrap();
         assert_eq!(
             reader.next().unwrap().unwrap(),
-            Value::Record(vec![
-                ("a".to_string(), Value::Long(27)),
-                ("b".to_string(), Value::String("foo".to_string())),
-                ("c".to_string(), Value::Enum(2, "clubs".to_string())),
-            ])
+            Value::Record(
+                "test".to_owned(),
+                vec![
+                    ("a".to_string(), Value::Long(27)),
+                    ("b".to_string(), Value::String("foo".to_string())),
+                    ("c".to_string(), Value::Enum(2, "clubs".to_string())),
+                ]
+            )
         );
         assert!(reader.next().is_none());
     }
@@ -946,11 +952,14 @@ mod tests {
         let mut reader = Reader::new(&input[..]).unwrap();
         assert_eq!(
             reader.next().unwrap().unwrap(),
-            Value::Record(vec![
-                ("a".to_string(), Value::Long(27)),
-                ("b".to_string(), Value::String("foo".to_string())),
-                ("c".to_string(), Value::Enum(2, "clubs".to_string())),
-            ])
+            Value::Record(
+                "test".to_owned(),
+                vec![
+                    ("a".to_string(), Value::Long(27)),
+                    ("b".to_string(), Value::String("foo".to_string())),
+                    ("c".to_string(), Value::Enum(2, "clubs".to_string())),
+                ]
+            )
         );
     }
 

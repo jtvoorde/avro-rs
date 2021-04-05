@@ -26,6 +26,7 @@ struct MapDeserializer<'de> {
 }
 
 struct StructDeserializer<'de> {
+    name: &'de String,
     input: Iter<'de, (String, Value)>,
     value: Option<&'de Value>,
 }
@@ -64,8 +65,9 @@ impl<'de> MapDeserializer<'de> {
 }
 
 impl<'de> StructDeserializer<'de> {
-    pub fn new(input: &'de [(String, Value)]) -> Self {
+    pub fn new(name: &'de String, input: &'de [(String, Value)]) -> Self {
         StructDeserializer {
+            name,
             input: input.iter(),
             value: None,
         }
@@ -242,7 +244,9 @@ impl<'a, 'de> de::Deserializer<'de> for &'a Deserializer<'de> {
                 Value::Double(d) => visitor.visit_f64(d),
                 _ => Err(de::Error::custom("Unsupported union")),
             },
-            Value::Record(ref fields) => visitor.visit_map(StructDeserializer::new(fields)),
+            Value::Record(ref name, ref fields) => {
+                visitor.visit_map(StructDeserializer::new(name, fields))
+            }
             Value::Array(ref fields) => visitor.visit_seq(SeqDeserializer::new(fields)),
             value => Err(de::Error::custom(format!(
                 "incorrect value of type: {:?}",
@@ -416,9 +420,13 @@ impl<'a, 'de> de::Deserializer<'de> for &'a Deserializer<'de> {
         V: Visitor<'de>,
     {
         match *self.input {
-            Value::Record(ref fields) => visitor.visit_map(StructDeserializer::new(fields)),
+            Value::Record(ref name, ref fields) => {
+                visitor.visit_map(StructDeserializer::new(name, fields))
+            }
             Value::Union(ref inner) => match **inner {
-                Value::Record(ref fields) => visitor.visit_map(StructDeserializer::new(fields)),
+                Value::Record(ref name, ref fields) => {
+                    visitor.visit_map(StructDeserializer::new(name, fields))
+                }
                 _ => Err(de::Error::custom("not a record")),
             },
             _ => Err(de::Error::custom("not a record")),
@@ -436,7 +444,9 @@ impl<'a, 'de> de::Deserializer<'de> for &'a Deserializer<'de> {
     {
         match *self.input {
             // This branch can be anything...
-            Value::Record(ref fields) => visitor.visit_enum(EnumDeserializer::new(&fields)),
+            Value::Record(ref name, ref fields) => {
+                visitor.visit_enum(EnumDeserializer::new(&fields))
+            }
             // This has to be a unit Enum
             Value::Enum(_index, ref field) => visitor.visit_enum(EnumUnitDeserializer::new(&field)),
             _ => Err(de::Error::custom("not an enum")),
@@ -663,10 +673,13 @@ mod tests {
 
     #[test]
     fn test_from_value() {
-        let test = Value::Record(vec![
-            ("a".to_owned(), Value::Long(27)),
-            ("b".to_owned(), Value::String("foo".to_owned())),
-        ]);
+        let test = Value::Record(
+            "Test".to_owned(),
+            vec![
+                ("a".to_owned(), Value::Long(27)),
+                ("b".to_owned(), Value::String("foo".to_owned())),
+            ],
+        );
         let expected = Test {
             a: 27,
             b: "foo".to_owned(),
@@ -674,16 +687,22 @@ mod tests {
         let final_value: Test = from_value(&test).unwrap();
         assert_eq!(final_value, expected);
 
-        let test_inner = Value::Record(vec![
-            (
-                "a".to_owned(),
-                Value::Record(vec![
-                    ("a".to_owned(), Value::Long(27)),
-                    ("b".to_owned(), Value::String("foo".to_owned())),
-                ]),
-            ),
-            ("b".to_owned(), Value::Int(35)),
-        ]);
+        let test_inner = Value::Record(
+            "TestInner".to_owned(),
+            vec![
+                (
+                    "a".to_owned(),
+                    Value::Record(
+                        "Test".to_owned(),
+                        vec![
+                            ("a".to_owned(), Value::Long(27)),
+                            ("b".to_owned(), Value::String("foo".to_owned())),
+                        ],
+                    ),
+                ),
+                ("b".to_owned(), Value::Int(35)),
+            ],
+        );
 
         let expected_inner = TestInner { a: expected, b: 35 };
         let final_value: TestInner = from_value(&test_inner).unwrap();
@@ -695,7 +714,10 @@ mod tests {
             a: UnitExternalEnum::Val1,
         };
 
-        let test = Value::Record(vec![("a".to_owned(), Value::Enum(0, "Val1".to_owned()))]);
+        let test = Value::Record(
+            "TestUnitExternalEnum".to_owned(),
+            vec![("a".to_owned(), Value::Enum(0, "Val1".to_owned()))],
+        );
         let final_value: TestUnitExternalEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,
@@ -706,10 +728,16 @@ mod tests {
             a: UnitInternalEnum::Val1,
         };
 
-        let test = Value::Record(vec![(
-            "a".to_owned(),
-            Value::Record(vec![("t".to_owned(), Value::String("Val1".to_owned()))]),
-        )]);
+        let test = Value::Record(
+            "TestUnitInternalEnum".to_owned(),
+            vec![(
+                "a".to_owned(),
+                Value::Record(
+                    "Val1".to_owned(),
+                    vec![("t".to_owned(), Value::String("Val1".to_owned()))],
+                ),
+            )],
+        );
         let final_value: TestUnitInternalEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,
@@ -719,10 +747,16 @@ mod tests {
             a: UnitAdjacentEnum::Val1,
         };
 
-        let test = Value::Record(vec![(
-            "a".to_owned(),
-            Value::Record(vec![("t".to_owned(), Value::String("Val1".to_owned()))]),
-        )]);
+        let test = Value::Record(
+            "TestUnitAdjacentEnum".to_owned(),
+            vec![(
+                "a".to_owned(),
+                Value::Record(
+                    "Val1".to_owned(),
+                    vec![("t".to_owned(), Value::String("Val1".to_owned()))],
+                ),
+            )],
+        );
         let final_value: TestUnitAdjacentEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,
@@ -732,7 +766,7 @@ mod tests {
             a: UnitUntaggedEnum::Val1,
         };
 
-        let test = Value::Record(vec![("a".to_owned(), Value::Null)]);
+        let test = Value::Record("Val1".to_owned(), vec![("a".to_owned(), Value::Null)]);
         let final_value: TestUnitUntaggedEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,
@@ -746,16 +780,22 @@ mod tests {
             a: SingleValueExternalEnum::Double(64.0),
         };
 
-        let test = Value::Record(vec![(
-            "a".to_owned(),
-            Value::Record(vec![
-                ("type".to_owned(), Value::String("Double".to_owned())),
-                (
-                    "value".to_owned(),
-                    Value::Union(Box::new(Value::Double(64.0))),
+        let test = Value::Record(
+            "TestSingleValueExternalEnum".to_string(),
+            vec![(
+                "a".to_string().to_owned(),
+                Value::Record(
+                    "Double".to_owned(),
+                    vec![
+                        ("type".to_owned(), Value::String("Double".to_owned())),
+                        (
+                            "value".to_owned(),
+                            Value::Union(Box::new(Value::Double(64.0))),
+                        ),
+                    ],
                 ),
-            ]),
-        )]);
+            )],
+        );
         let final_value: TestSingleValueExternalEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,
@@ -769,19 +809,28 @@ mod tests {
             a: StructExternalEnum::Val1 { x: 1.0, y: 2.0 },
         };
 
-        let test = Value::Record(vec![(
-            "a".to_owned(),
-            Value::Record(vec![
-                ("type".to_owned(), Value::String("Val1".to_owned())),
-                (
-                    "value".to_owned(),
-                    Value::Union(Box::new(Value::Record(vec![
-                        ("x".to_owned(), Value::Float(1.0)),
-                        ("y".to_owned(), Value::Float(2.0)),
-                    ]))),
+        let test = Value::Record(
+            "TestStructExternalEnum".to_owned(),
+            vec![(
+                "a".to_owned(),
+                Value::Record(
+                    "Val1".to_owned(),
+                    vec![
+                        ("type".to_owned(), Value::String("Val1".to_owned())),
+                        (
+                            "value".to_owned(),
+                            Value::Union(Box::new(Value::Record(
+                                "Val1".to_owned(),
+                                vec![
+                                    ("x".to_owned(), Value::Float(1.0)),
+                                    ("y".to_owned(), Value::Float(2.0)),
+                                ],
+                            ))),
+                        ),
+                    ],
                 ),
-            ]),
-        )]);
+            )],
+        );
         let final_value: TestStructExternalEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,
@@ -795,19 +844,25 @@ mod tests {
             a: TupleExternalEnum::Val1(1.0, 2.0),
         };
 
-        let test = Value::Record(vec![(
-            "a".to_owned(),
-            Value::Record(vec![
-                ("type".to_owned(), Value::String("Val1".to_owned())),
-                (
-                    "value".to_owned(),
-                    Value::Union(Box::new(Value::Array(vec![
-                        Value::Float(1.0),
-                        Value::Float(2.0),
-                    ]))),
+        let test = Value::Record(
+            "TestTupleExternalEnum".to_owned(),
+            vec![(
+                "a".to_owned(),
+                Value::Record(
+                    "Val1".to_owned(),
+                    vec![
+                        ("type".to_owned(), Value::String("Val1".to_owned())),
+                        (
+                            "value".to_owned(),
+                            Value::Union(Box::new(Value::Array(vec![
+                                Value::Float(1.0),
+                                Value::Float(2.0),
+                            ]))),
+                        ),
+                    ],
                 ),
-            ]),
-        )]);
+            )],
+        );
         let final_value: TestTupleExternalEnum = from_value(&test).unwrap();
         assert_eq!(
             final_value, expected,

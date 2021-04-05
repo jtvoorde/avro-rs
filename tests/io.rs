@@ -19,7 +19,7 @@ lazy_static! {
         (r#"{"type": "array", "items": "long"}"#, Value::Array(vec![Value::Long(1), Value::Long(3), Value::Long(2)])),
         (r#"{"type": "map", "values": "long"}"#, Value::Map([("a".to_string(), Value::Long(1i64)), ("b".to_string(), Value::Long(3i64)), ("c".to_string(), Value::Long(2i64))].iter().cloned().collect())),
         (r#"["string", "null", "long"]"#, Value::Union(Box::new(Value::Null))),
-        (r#"{"type": "record", "name": "Test", "fields": [{"name": "f", "type": "long"}]}"#, Value::Record(vec![("f".to_string(), Value::Long(1))]))
+        (r#"{"type": "record", "name": "Test", "fields": [{"name": "f", "type": "long"}]}"#, Value::Record("Test".to_owned(), vec![("f".to_string(), Value::Long(1))]))
     ];
 
     static ref BINARY_ENCODINGS: Vec<(i64, Vec<u8>)> = vec![
@@ -61,7 +61,7 @@ lazy_static! {
         (r#"[{"type": "string", "logicalType": "uuid"}, "null"]"#, r#""64a8cd70-28e3-4fc4-9c7f-db18d8cac512""#, Value::Union(Box::new(Value::Uuid(uuid::Uuid::from_str("64a8cd70-28e3-4fc4-9c7f-db18d8cac512").unwrap())))),
         (r#"[{"type": "long", "logicalType": "timestamp-millis"}, "null"]"#, "123456789", Value::Union(Box::new(Value::TimestampMillis(123456789)))),
 
-        (r#"{"type": "record", "name": "F", "fields": [{"name": "A", "type": "int"}]}"#, r#"{"A": 5}"#,Value::Record(vec![("A".to_string(), Value::Int(5))])),
+        (r#"{"type": "record", "name": "F", "fields": [{"name": "A", "type": "int"}]}"#, r#"{"A": 5}"#,Value::Record("F".to_owned(), vec![("A".to_string(), Value::Int(5))])),
     ];
 
     static ref LONG_RECORD_SCHEMA: Schema = Schema::parse_str(r#"
@@ -80,7 +80,7 @@ lazy_static! {
     }
     "#).unwrap();
 
-    static ref LONG_RECORD_DATUM: Value = Value::Record(vec![
+    static ref LONG_RECORD_DATUM: Value = Value::Record("Test".to_owned(), vec![
         ("A".to_string(), Value::Int(1)),
         ("B".to_string(), Value::Int(2)),
         ("C".to_string(), Value::Int(3)),
@@ -205,7 +205,10 @@ fn test_default_value() {
             field_type, default_json
         ))
         .unwrap();
-        let datum_to_read = Value::Record(vec![("H".to_string(), default_datum.clone())]);
+        let datum_to_read = Value::Record(
+            "Test".to_owned(),
+            vec![("H".to_string(), default_datum.clone())],
+        );
         let encoded = to_avro_datum(&LONG_RECORD_SCHEMA, LONG_RECORD_DATUM.clone()).unwrap();
         let datum_read = from_avro_datum(
             &LONG_RECORD_SCHEMA,
@@ -258,10 +261,13 @@ fn test_projection() {
     "#,
     )
     .unwrap();
-    let datum_to_read = Value::Record(vec![
-        ("E".to_string(), Value::Int(5)),
-        ("F".to_string(), Value::Int(6)),
-    ]);
+    let datum_to_read = Value::Record(
+        "Test".to_owned(),
+        vec![
+            ("E".to_string(), Value::Int(5)),
+            ("F".to_string(), Value::Int(6)),
+        ],
+    );
     let encoded = to_avro_datum(&LONG_RECORD_SCHEMA, LONG_RECORD_DATUM.clone()).unwrap();
     let datum_read = from_avro_datum(
         &LONG_RECORD_SCHEMA,
@@ -287,10 +293,13 @@ fn test_field_order() {
     "#,
     )
     .unwrap();
-    let datum_to_read = Value::Record(vec![
-        ("F".to_string(), Value::Int(6)),
-        ("E".to_string(), Value::Int(5)),
-    ]);
+    let datum_to_read = Value::Record(
+        "Test".to_owned(),
+        vec![
+            ("F".to_string(), Value::Int(6)),
+            ("E".to_string(), Value::Int(5)),
+        ],
+    );
     let encoded = to_avro_datum(&LONG_RECORD_SCHEMA, LONG_RECORD_DATUM.clone()).unwrap();
     let datum_read = from_avro_datum(
         &LONG_RECORD_SCHEMA,
@@ -316,10 +325,13 @@ fn test_type_exception() -> Result<(), String> {
     "#,
     )
     .unwrap();
-    let datum_to_write = Value::Record(vec![
-        ("E".to_string(), Value::Int(5)),
-        ("F".to_string(), Value::String(String::from("Bad"))),
-    ]);
+    let datum_to_write = Value::Record(
+        "Test".to_owned(),
+        vec![
+            ("E".to_string(), Value::Int(5)),
+            ("F".to_string(), Value::String(String::from("Bad"))),
+        ],
+    );
     let encoded = to_avro_datum(&writer_schema, datum_to_write);
     match encoded {
         Ok(_) => Err(String::from("Expected ValidationError, got Ok")),

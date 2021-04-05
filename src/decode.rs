@@ -204,7 +204,10 @@ pub fn decode<R: Read>(schema: SchemaType, reader: &mut R) -> AvroResult<Value> 
                 // TODO: This clone is also expensive. See if we can do away with it...
                 items.push((field.name().to_string(), decode(field.schema(), reader)?));
             }
-            Ok(Value::Record(items))
+            Ok(Value::Record(
+                record.name().fullname(None).to_string(),
+                items,
+            ))
         }
         SchemaType::Enum(enum_) => {
             let symbols = enum_.symbols();

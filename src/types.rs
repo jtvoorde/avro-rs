@@ -8,6 +8,7 @@ use crate::{
 };
 use serde_json::{Number, Value as JsonValue};
 use std::{
+    borrow::Cow,
     collections::HashMap,
     convert::{From, TryFrom, TryInto},
     hash::BuildHasher,
@@ -67,7 +68,7 @@ pub enum Value {
     /// This allows schema-less encoding.
     ///
     /// See [Record](types.Record) for a more user-friendly support.
-    Record(Vec<(String, Value)>),
+    Record(String, Vec<(String, Value)>),
     /// A date value.
     ///
     /// Serialized and deserialized as `i32` directly. Can only be deserialized properly with a
@@ -231,7 +232,11 @@ impl<'a> Record<'a> {
 
 impl<'a> From<Record<'a>> for Value {
     fn from(value: Record<'a>) -> Self {
-        Self::Record(value.fields)
+        if let SchemaType::Record(schema) = value.schema_type {
+            Self::Record(schema.name().fullname(None).to_string(), value.fields)
+        } else {
+            panic!("Not a record schema") // TODO: Fix error handling
+        }
     }
 }
 
@@ -287,7 +292,7 @@ impl std::convert::TryFrom<Value> for JsonValue {
                 .map(|(key, value)| Self::try_from(value).map(|v| (key, v)))
                 .collect::<Result<Vec<_>, _>>()
                 .map(|v| Self::Object(v.into_iter().collect())),
-            Value::Record(items) => items
+            Value::Record(_, items) => items
                 .into_iter()
                 .map(|(key, value)| Self::try_from(value).map(|v| (key, v)))
                 .collect::<Result<Vec<_>, _>>()
@@ -357,7 +362,8 @@ impl Value {
             (&Value::Map(ref items), SchemaType::Map(map)) => {
                 items.iter().all(|(_, value)| value.validate(map.items()))
             }
-            (&Value::Record(ref record_fields), SchemaType::Record(record)) => {
+            (&Value::Record(ref _name, ref record_fields), SchemaType::Record(record)) => {
+                // TODO: Match record names?
                 let fields = record.fields();
                 fields.len() == record_fields.len()
                     && fields.iter().zip(record_fields.iter()).all(
@@ -691,7 +697,7 @@ impl Value {
         let fields = record.fields();
         let mut items = match self {
             Value::Map(items) => Ok(items),
-            Value::Record(fields) => Ok(fields.into_iter().collect::<HashMap<_, _>>()),
+            Value::Record(_, fields) => Ok(fields.into_iter().collect::<HashMap<_, _>>()),
             other => Err(Error::GetRecord {
                 expected: fields
                     .iter()
@@ -719,7 +725,10 @@ impl Value {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Value::Record(new_fields))
+        Ok(Value::Record(
+            record.name().fullname(None).to_string(),
+            new_fields,
+        ))
     }
 
     fn resolve_default_value(schema: &SchemaType, value: Value) -> Result<Value, Error> {
@@ -845,7 +854,7 @@ mod tests {
                 false,
             ),
             (
-                Value::Record(vec![]),
+                Value::Record("RecordName".to_owned(), vec![]),
                 {
                     let builder = Schema::builder();
                     let root = builder.null();
@@ -919,35 +928,50 @@ mod tests {
             builder.build(root).unwrap()
         };
 
-        assert!(Value::Record(vec![
-            ("a".to_string(), Value::Long(42i64)),
-            ("b".to_string(), Value::String("foo".to_string())),
-        ])
+        assert!(Value::Record(
+            "RecordName".to_owned(),
+            vec![
+                ("a".to_string(), Value::Long(42i64)),
+                ("b".to_string(), Value::String("foo".to_string())),
+            ]
+        )
         .validate(schema.root()));
 
-        assert!(!Value::Record(vec![
-            ("b".to_string(), Value::String("foo".to_string())),
-            ("a".to_string(), Value::Long(42i64)),
-        ])
+        assert!(!Value::Record(
+            "RecordName".to_owned(),
+            vec![
+                ("b".to_string(), Value::String("foo".to_string())),
+                ("a".to_string(), Value::Long(42i64)),
+            ]
+        )
         .validate(schema.root()));
 
-        assert!(!Value::Record(vec![
-            ("a".to_string(), Value::Boolean(false)),
-            ("b".to_string(), Value::String("foo".to_string())),
-        ])
+        assert!(!Value::Record(
+            "RecordName".to_owned(),
+            vec![
+                ("a".to_string(), Value::Boolean(false)),
+                ("b".to_string(), Value::String("foo".to_string())),
+            ]
+        )
         .validate(schema.root()));
 
-        assert!(!Value::Record(vec![
-            ("a".to_string(), Value::Long(42i64)),
-            ("c".to_string(), Value::String("foo".to_string())),
-        ])
+        assert!(!Value::Record(
+            "RecordName".to_owned(),
+            vec![
+                ("a".to_string(), Value::Long(42i64)),
+                ("c".to_string(), Value::String("foo".to_string())),
+            ]
+        )
         .validate(schema.root()));
 
-        assert!(!Value::Record(vec![
-            ("a".to_string(), Value::Long(42i64)),
-            ("b".to_string(), Value::String("foo".to_string())),
-            ("c".to_string(), Value::Null),
-        ])
+        assert!(!Value::Record(
+            "RecordName".to_owned(),
+            vec![
+                ("a".to_string(), Value::Long(42i64)),
+                ("b".to_string(), Value::String("foo".to_string())),
+                ("c".to_string(), Value::Null),
+            ]
+        )
         .validate(schema.root()));
     }
 
@@ -1155,11 +1179,14 @@ mod tests {
             )
         );
         assert_eq!(
-            JsonValue::try_from(Value::Record(vec![
-                ("v1".to_string(), Value::Int(1)),
-                ("v2".to_string(), Value::Int(2)),
-                ("v3".to_string(), Value::Int(3))
-            ]))
+            JsonValue::try_from(Value::Record(
+                "RecordName".to_owned(),
+                vec![
+                    ("v1".to_string(), Value::Int(1)),
+                    ("v2".to_string(), Value::Int(2)),
+                    ("v3".to_string(), Value::Int(3))
+                ]
+            ))
             .unwrap(),
             JsonValue::Object(
                 vec![

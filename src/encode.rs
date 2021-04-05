@@ -49,7 +49,10 @@ pub fn encode_ref(value: &Value, schema: SchemaType, buffer: &mut Vec<u8>) {
             match schema {
                 SchemaType::Decimal(dec) if dec.size().is_some() => buffer.extend(bytes),
                 SchemaType::Decimal(_) => encode_bytes(&bytes, buffer),
-                _ => panic!("Cannot encode a decimal with underlying schema `{:?}`", schema),
+                _ => panic!(
+                    "Cannot encode a decimal with underlying schema `{:?}`",
+                    schema
+                ),
             }
         }
         &Value::Duration(duration) => {
@@ -108,7 +111,7 @@ pub fn encode_ref(value: &Value, schema: SchemaType, buffer: &mut Vec<u8>) {
                 buffer.push(0u8);
             }
         }
-        Value::Record(fields) => {
+        Value::Record(_, fields) => {
             if let SchemaType::Record(record) = schema {
                 for (i, &(_, ref value)) in fields.iter().enumerate() {
                     encode_ref(value, record.fields()[i].schema(), buffer);

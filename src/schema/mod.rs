@@ -597,7 +597,8 @@ impl<'s> UnionSchema<'s> {
     pub fn resolve_union_schema(&self, value: &crate::types::Value) -> Option<(usize, SchemaType)> {
         let mut counter = 0;
         match value {
-            crate::types::Value::Record(fields) => {
+            crate::types::Value::Record(name, fields) => {
+                // TODO: Match by record name instead?
                 self.iter_variants()
                     .enumerate()
                     .find(|(_pos, schema_type)| {
@@ -750,7 +751,7 @@ impl<'a> From<&'a types::Value> for SchemaKind {
             types::Value::Array(_) => SchemaKind::Array,
             types::Value::Map(_) => SchemaKind::Map,
             types::Value::Union(_) => SchemaKind::Union,
-            types::Value::Record(_) => SchemaKind::Record,
+            types::Value::Record(_, _) => SchemaKind::Record,
             types::Value::Enum(_, _) => SchemaKind::Enum,
             types::Value::Fixed(_, _) => SchemaKind::Fixed,
             types::Value::Uuid(_) => SchemaKind::Uuid,
